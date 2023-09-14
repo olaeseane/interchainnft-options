@@ -1,0 +1,26 @@
+[package]
+name = "call-option"
+description = "Covered call options contract."
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+cosmwasm-std = { workspace = true }
+cosmwasm-schema = { workspace = true }
+cw-storage-plus = { workspace = true }
+cw721-base = { workspace = true }
+cw721 = { workspace = true }
+cw-utils = { workspace = true }
+cw2 = { workspace = true }
+cw-ownable = { workspace = true }
+thiserror = { workspace = true }
+schemars = { workspace = true }
+
+vault = { path = "../vault" }
+factory = { path = "../factory" }
+common = { path = "../../packages/common" }
+macros = { path = "../../packages/macros" }

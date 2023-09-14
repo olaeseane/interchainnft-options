@@ -1,0 +1,31 @@
+[package]
+name = "protocol"
+description = "Core contracts."
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+authors.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+serde = { workspace = true }
+cosmwasm-std = { workspace = true }
+cosmwasm-schema = { workspace = true }
+cw-storage-plus = { workspace = true }
+cw-utils = { workspace = true }
+cw2 = { workspace = true }
+cw-ownable = { workspace = true }
+thiserror = { workspace = true }
+
+common = { path = "../../packages/common" }
+rbac = { path = "../../packages/rbac" }
+macros = { path = "../../packages/macros" }
+
+[dev-dependencies]
+env_logger = { workspace = true }
+log = { workspace = true }
+lazy_static = { workspace = true }
+once_cell = { workspace = true }

@@ -1,0 +1,33 @@
+[package]
+name = "testing"
+description = "Utilities for testing InterchainnftOptions smart contracts."
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+authors.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { workspace = true }
+cosmwasm-std = { workspace = true }
+cosmwasm-schema = { workspace = true }
+cw-storage-plus = { workspace = true }
+cw-utils = { workspace = true }
+cw2 = { workspace = true }
+cw-ownable = { workspace = true }
+cw721 = { workspace = true }
+thiserror = { workspace = true }
+
+cw721-base = { version = "0.18.0", features = ["library"] }
+cw-multi-test = "~0.16"
+bech32 = "0.9.1"
+anyhow = "~1.0"
+
+rbac = { path = "../rbac" }
+common = { path = "../common" }
+vault = { path = "../../contracts/vault" }
+factory = { path = "../../contracts/factory" }
+protocol = { path = "../../contracts/protocol" }
+call-option = { path = "../../contracts/call-option" }

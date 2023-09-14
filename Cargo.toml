@@ -1,0 +1,47 @@
+[workspace]
+members = [
+    "contracts/protocol",
+    "contracts/vault",
+    "contracts/factory",
+    "contracts/call-option",
+    "integration-tests",
+    "packages/*",
+]
+
+[workspace.package]
+edition = "2021"
+license = "BSD-3-Clause"
+repository = "https://github.com/interchainnft-options"
+version = "0.1.0"
+authors = ["author"]
+
+[workspace.dependencies]
+cosmwasm-std = { version = "~1", features = ["iterator"] }
+cosmwasm-schema = "~1"
+cw-storage-plus = "~1"
+cw-utils = "~1"
+cw2 = "~1"
+cw721-base = "~0.18"
+cw-ownable = "~0.5"
+cw721 = "~0.18"
+thiserror = "~1"
+schemars = "~0.8"
+serde = { version = "1.0.183", default-features = false, features = ["derive"] }
+
+env_logger = "~0.10"
+log = "~0.4"
+lazy_static = "1.4"
+once_cell = "1.8"
+
+[profile.release]
+codegen-units = 1
+opt-level = 3
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+panic = 'abort'
+incremental = false
+# Please do not disable these. Doing so will cause overflow checks in
+# all workspace members to stop working. Overflows should be errors.
+overflow-checks = true

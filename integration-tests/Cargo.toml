@@ -1,0 +1,30 @@
+[package]
+name = "integration-tests"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+authors.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dev-dependencies]
+serde = { workspace = true }
+cosmwasm-std = { workspace = true }
+cosmwasm-schema = { workspace = true }
+cw-storage-plus = { workspace = true }
+cw-utils = { workspace = true }
+cw2 = { workspace = true }
+cw-ownable = { workspace = true }
+cw721 = { workspace = true }
+thiserror = { workspace = true }
+
+env_logger = "~0.10"
+log = "~0.4"
+
+vault = { path = "../contracts/vault" }
+testing = { path = "../packages/testing" }
