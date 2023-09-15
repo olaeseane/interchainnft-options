@@ -1,54 +1,35 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::StdResult;
-use cosmwasm_std::{Addr, Api, StdError, Storage};
+use cosmwasm_std::{Addr, StdError, Storage};
 use cw_storage_plus::Item;
 use cw_utils::Expiration;
 
-use common::errors::ContractError;
 use macros::ConfigStorage;
 use rbac::Role;
-
-use crate::msg::InstantiateMsg;
 
 /// Saves factory settings
 pub const CONFIG: Item<Config> = Item::new("config");
 
 /// This structure holds the main parameters for the ?
 #[cw_serde]
-#[derive(ConfigStorage)]
+#[derive(Default, ConfigStorage)]
 pub struct Config {
     /// The address of the deployed vault factory contract.
-    pub vault_factory_addr: Addr,
+    pub vault_factory_addr: Option<Addr>,
     /// The address of the deployed covered call factory contract.
-    pub option_factory_addr: Addr,
-}
-
-impl From<InstantiateMsg> for Config {
-    fn from(value: InstantiateMsg) -> Self {
-        Self {
-            vault_factory_addr: Addr::unchecked(value.vault_factory_addr),
-            option_factory_addr: Addr::unchecked(value.option_factory_addr),
-        }
-    }
+    pub call_factory_addr: Option<Addr>,
 }
 
 impl Config {
-    pub fn validate(&self, api: &dyn Api) -> Result<(), ContractError> {
-        api.addr_validate(self.vault_factory_addr.as_str())?;
-        api.addr_validate(self.option_factory_addr.as_str())?;
-        Ok(())
-    }
-
     pub fn update(
         store: &mut dyn Storage,
         new_vault_factory: Option<Addr>,
-        new_option_factory: Option<Addr>,
+        new_call_factory: Option<Addr>,
     ) -> StdResult<()> {
         CONFIG
             .update::<_, StdError>(store, |mut config| {
-                config.option_factory_addr =
-                    new_option_factory.unwrap_or(config.option_factory_addr);
-                config.vault_factory_addr = new_vault_factory.unwrap_or(config.vault_factory_addr);
+                config.call_factory_addr = new_call_factory.or(config.call_factory_addr);
+                config.vault_factory_addr = new_vault_factory.or(config.vault_factory_addr);
                 Ok(config)
             })
             .map(|_| ())

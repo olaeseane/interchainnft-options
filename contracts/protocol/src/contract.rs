@@ -23,6 +23,9 @@ pub fn instantiate(
 
     // TODO If no admin is specified, the contract is its own admin?
 
+    let config = Config::default();
+    config.save(deps.storage)?;
+
     let owner_addr = if let Some(owner) = msg.owner.clone() {
         deps.api.addr_validate(&owner)?
     } else {
@@ -31,11 +34,6 @@ pub fn instantiate(
 
     cw_ownable::initialize_owner(deps.storage, deps.api, Some(owner_addr.as_ref()))?;
     ADMINS.grant(deps.storage, owner_addr)?;
-
-    // TODO add real data for config
-    let config: Config = msg.into();
-    config.validate(deps.api)?;
-    config.save(deps.storage)?;
 
     Ok(Response::new()
         .add_attribute("action", "instantiate")
@@ -56,8 +54,8 @@ pub fn execute(
             execute::set_vault_factory(deps, &info.sender, contract_addr)
         }
 
-        ExecuteMsg::SetCoveredCallFactory { contract_addr } => {
-            execute::set_covered_call_factory(deps, &info.sender, contract_addr)
+        ExecuteMsg::SetCallFactory { contract_addr } => {
+            execute::set_call_factory(deps, &info.sender, contract_addr)
         }
     }
 }

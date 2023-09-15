@@ -7,10 +7,6 @@ use crate::state::Config;
 pub struct InstantiateMsg {
     /// Address allowed to change contract parameters
     pub owner: Option<String>,
-    /// The address of the deployed vault factory contract.
-    pub vault_factory_addr: String,
-    /// The address of the deployed covered call factory contract.
-    pub option_factory_addr: String,
 }
 
 /// This structure describes the execute messages of the contract.
@@ -26,7 +22,7 @@ pub enum ExecuteMsg {
 
     /// Allows an admin to set the address of the deployed covered call factory
     /// This address is used by other protocols searching for the registry of protocols.
-    SetCoveredCallFactory { contract_addr: String },
+    SetCallFactory { contract_addr: String },
 }
 
 #[cw_serde]

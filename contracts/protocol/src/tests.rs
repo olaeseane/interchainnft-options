@@ -33,13 +33,8 @@ fn setup(info_sender: &str) -> (OwnedDeps<MockStorage, MockApi, MockQuerier>, Me
     let mut deps = mock_dependencies();
     let info = mock_info(info_sender, &[]);
 
-    let vault_factory_addr = "cosmos_vault_factory_addr".to_string();
-    let option_factory_addr = "cosmos_option_factory_addr".to_string();
-
     let msg = InstantiateMsg {
         owner: Some(OWNER.to_string()),
-        vault_factory_addr: vault_factory_addr.clone(),
-        option_factory_addr: option_factory_addr.clone(),
     };
     let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg);
 
@@ -50,13 +45,8 @@ fn setup(info_sender: &str) -> (OwnedDeps<MockStorage, MockApi, MockQuerier>, Me
 
 #[test]
 fn proper_initialization() {
-    let vault_factory_addr = "cosmos_vault_factory_addr".to_string();
-    let option_factory_addr = "cosmos_option_factory_addr".to_string();
-
     let msg = InstantiateMsg {
         owner: Some(OWNER.to_string()),
-        vault_factory_addr: vault_factory_addr.clone(),
-        option_factory_addr: option_factory_addr.clone(),
     };
 
     let mut deps = mock_dependencies();
@@ -70,10 +60,6 @@ fn proper_initialization() {
             .add_attribute("action", "instantiate")
             .add_attribute("sender", "user_addr"))
     );
-
-    let config = Config::load(&deps.storage).unwrap();
-    assert_eq!(config.vault_factory_addr, vault_factory_addr);
-    assert_eq!(config.vault_factory_addr, vault_factory_addr);
 
     let version = cw2::get_contract_version(&deps.storage).unwrap();
     assert_eq!(
@@ -92,11 +78,11 @@ fn proper_initialization() {
 }
 
 #[test]
-fn set_vault_factory_and_covered_call_factory() {
+fn set_vault_factory_and_call_factory() {
     let (mut deps, info) = setup(OWNER);
 
-    let msg = ExecuteMsg::SetCoveredCallFactory {
-        contract_addr: "new_covered_call_factory".to_string(),
+    let msg = ExecuteMsg::SetCallFactory {
+        contract_addr: "new_call_factory_addr".to_string(),
     };
     let _ = contract::execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
@@ -109,12 +95,12 @@ fn set_vault_factory_and_covered_call_factory() {
     let res = contract::query(deps.as_ref(), mock_env(), msg).unwrap();
     let config: Config = from_binary(&res).unwrap();
     assert_eq!(
-        config.option_factory_addr,
-        Addr::unchecked("new_covered_call_factory")
+        config.call_factory_addr,
+        Some(Addr::unchecked("new_call_factory_addr"))
     );
     assert_eq!(
         config.vault_factory_addr,
-        Addr::unchecked("new_vault_factory_addr")
+        Some(Addr::unchecked("new_vault_factory_addr"))
     )
 }
 
@@ -122,8 +108,8 @@ fn set_vault_factory_and_covered_call_factory() {
 fn not_owner_cant_set_vault_factory() {
     let (mut deps, info) = setup(USER);
 
-    let msg = ExecuteMsg::SetCoveredCallFactory {
-        contract_addr: "new_covered_call_factory".to_string(),
+    let msg = ExecuteMsg::SetCallFactory {
+        contract_addr: "new_call_factory_addr".to_string(),
     };
     let res = contract::execute(deps.as_mut(), mock_env(), info.clone(), msg);
 
