@@ -17,10 +17,6 @@ pub struct Config {
     pub protocol_addr: Addr,
     /// Vault contract code identifier
     pub vault_code_id: u64,
-    // /// Multi-vault contract code identifier
-    // pub multi_vault_code_id: u64,
-    // /// Solo-vault contract code identifier
-    // pub solo_vault_code_id: u64,
 }
 
 impl Config {
@@ -35,18 +31,16 @@ impl From<InstantiateMsg> for Config {
         Config {
             protocol_addr: Addr::unchecked(value.protocol_addr),
             vault_code_id: value.vault_code_id,
-            // multi_vault_code_id: value.multi_vault_code_id,
-            // solo_vault_code_id: value.solo_vault_code_id,
         }
     }
 }
 
 /// Registry of all of the active multi-vaults within the protocol
-pub const MULTI_VAULTS: Map<&Addr, Addr> = Map::new("multi_vaults");
+pub(crate) const MULTI_VAULTS: Map<&Addr, Addr> = Map::new("multi_vaults");
 
 /// Registry of all of the active vaults within the protocol, allowing users
 /// to find vaults by project address and tokenId;
-pub const SOLO_VAULTS: Map<(&Addr, &TokenId), Addr> = Map::new("solo_vaults");
+pub(crate) const SOLO_VAULTS: Map<(&Addr, &TokenId), Addr> = Map::new("solo_vaults");
 
 /// This is an intermediate structure for storing a vault info. It is used in a submessage response.
 #[cw_serde]

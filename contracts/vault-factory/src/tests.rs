@@ -27,8 +27,6 @@ static SETUP_LOGGER: Lazy<Mutex<()>> = Lazy::new(|| {
 const OWNER: &str = "owner_addr";
 const USER: &str = "user_addr";
 const VAULT_CODE_ID: u64 = 11;
-// const MULTI_VAULT_CODE_ID: u64 = 11;
-// const SOLO_VAULT_CODE_ID: u64 = 12;
 
 #[allow(dead_code)]
 #[allow(let_underscore_lock)]
@@ -41,8 +39,6 @@ fn setup(info_sender: &str) -> (OwnedDeps<MockStorage, MockApi, MockQuerier>, Me
     let msg = InstantiateMsg {
         protocol_addr: "protocol_addr".to_string(),
         vault_code_id: VAULT_CODE_ID,
-        // multi_vault_code_id: MULTI_VAULT_CODE_ID,
-        // solo_vault_code_id: SOLO_VAULT_CODE_ID,
         owner: Some(OWNER.to_string()),
     };
     let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg);
@@ -57,8 +53,6 @@ fn proper_initialization() {
     let msg = InstantiateMsg {
         protocol_addr: "protocol_addr".to_string(),
         vault_code_id: VAULT_CODE_ID,
-        // multi_vault_code_id: MULTI_VAULT_CODE_ID,
-        // solo_vault_code_id: SOLO_VAULT_CODE_ID,
         owner: Some(OWNER.to_string()),
     };
 
@@ -75,16 +69,14 @@ fn proper_initialization() {
     );
 
     let config = Config::load(&deps.storage).unwrap();
-    assert_eq!(config.protocol_addr, "protocol_addr".to_string());
+    assert_eq!(config.protocol_addr, "protocol_addr");
     assert_eq!(config.vault_code_id, VAULT_CODE_ID);
-    // assert_eq!(config.multi_vault_code_id, MULTI_VAULT_CODE_ID);
-    // assert_eq!(config.solo_vault_code_id, SOLO_VAULT_CODE_ID);
 
     let version = cw2::get_contract_version(&deps.storage).unwrap();
     assert_eq!(
         version,
         ContractVersion {
-            contract: "crates.io:interchainnft-options-factory".to_string(),
+            contract: "crates.io:interchainnft-options-vault-factory".to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
         }
     );

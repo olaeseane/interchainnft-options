@@ -9,10 +9,6 @@ pub struct InstantiateMsg {
     pub protocol_addr: String,
     /// Valut contract code identifier
     pub vault_code_id: u64,
-    // /// Multi-valut contract code identifier
-    // pub multi_vault_code_id: u64,
-    // /// Solo-valut contract code identifier
-    // pub solo_vault_code_id: u64,
     /// Address allowed to change contract parameters
     pub owner: Option<String>,
 }

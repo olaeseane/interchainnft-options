@@ -13,7 +13,7 @@ use crate::{
     state::{Config, MULTI_VAULTS, SOLO_VAULTS, TMP_VAULT},
 };
 
-const CONTRACT_NAME: &str = "crates.io:interchainnft-options-factory";
+const CONTRACT_NAME: &str = "crates.io:interchainnft-options-vault-factory";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]

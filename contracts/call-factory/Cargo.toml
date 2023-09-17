@@ -1,6 +1,6 @@
 [package]
-name = "factory"
-description = "The Factory creates a specific vault for NFTs."
+name = "call-factory"
+description = "The Factory creates a call option instrument for the specific NFT."
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -21,6 +21,7 @@ cw-ownable = { workspace = true }
 thiserror = { workspace = true }
 
 vault = { path = "../vault" }
+call = { path = "../call" }
 common = { path = "../../packages/common" }
 macros = { path = "../../packages/macros" }
 

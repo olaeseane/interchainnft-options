@@ -1,0 +1,32 @@
+[package]
+name = "vault-factory"
+description = "The Factory creates a specific vault for NFTs."
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+authors.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+serde = { workspace = true }
+cosmwasm-std = { workspace = true }
+cosmwasm-schema = { workspace = true }
+cw-storage-plus = { workspace = true }
+cw-utils = { workspace = true }
+cw2 = { workspace = true }
+cw-ownable = { workspace = true }
+thiserror = { workspace = true }
+
+vault = { path = "../vault" }
+common = { path = "../../packages/common" }
+macros = { path = "../../packages/macros" }
+
+
+[dev-dependencies]
+env_logger = "~0.10"
+log = "~0.4"
+# lazy_static = "1.4"
+once_cell = "1.8"
