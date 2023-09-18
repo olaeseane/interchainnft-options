@@ -12,6 +12,10 @@ authors.workspace = true
 crate-type = ["cdylib", "rlib"]
 doctest = false
 
+[features]
+# for more explicit tests, cargo test --features=backtraces
+backtraces = ["cosmwasm-std/backtraces"]
+
 [dev-dependencies]
 serde = { workspace = true }
 cosmwasm-std = { workspace = true }
@@ -22,9 +26,12 @@ cw2 = { workspace = true }
 cw-ownable = { workspace = true }
 cw721 = { workspace = true }
 thiserror = { workspace = true }
+cw721-base = { workspace = true }
 
 env_logger = "~0.10"
 log = "~0.4"
 
 vault = { path = "../contracts/vault" }
+call = { path = "../contracts/call" }
+call-factory = { path = "../contracts/call-factory" }
 testing = { path = "../packages/testing" }
