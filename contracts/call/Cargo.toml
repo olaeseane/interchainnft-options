@@ -1,11 +1,14 @@
 [package]
-name = "call-option"
+name = "call"
 description = "Covered call options contract."
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 version.workspace = true
 authors.workspace = true
+
+[lib]
+doctest = false
 
 [dependencies]
 serde = { workspace = true }
@@ -21,6 +24,6 @@ thiserror = { workspace = true }
 schemars = { workspace = true }
 
 vault = { path = "../vault" }
-factory = { path = "../factory" }
+vault-factory = { path = "../vault-factory" }
 common = { path = "../../packages/common" }
 macros = { path = "../../packages/macros" }

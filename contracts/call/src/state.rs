@@ -24,7 +24,7 @@ pub struct Config {
     /// The address of the token contract permitted to serve as underlying assets for this instrument.
     pub allowed_underlying_nft: Addr,
     /// The address of the vault factory.
-    pub factory_addr: Addr,
+    pub vault_factory_addr: Addr,
     /// Default min duration in seconds of an created option
     pub minimum_option_duration: u64,
     /// TODO
@@ -37,15 +37,12 @@ pub struct Config {
 
 impl Config {
     pub fn validate(&self, api: &dyn Api) -> Result<(), ContractError> {
-        assert_valid_addr(
-            api,
-            vec![
-                self.protocol_addr.as_str(),
-                self.allowed_underlying_nft.as_str(),
-                self.factory_addr.as_str(),
-            ],
-            PREFIX,
-        )
+        // TODO  assert_valid_addr()?
+
+        api.addr_validate(self.protocol_addr.as_str())?;
+        api.addr_validate(self.allowed_underlying_nft.as_str())?;
+        api.addr_validate(self.vault_factory_addr.as_str())?;
+        Ok(())
     }
 }
 
@@ -54,7 +51,7 @@ impl From<InstantiateMsg> for Config {
         Self {
             protocol_addr: Addr::unchecked(value.protocol_addr),
             allowed_underlying_nft: Addr::unchecked(value.allowed_underlying_nft),
-            factory_addr: Addr::unchecked(value.factory_addr),
+            vault_factory_addr: Addr::unchecked(value.vault_factory_addr),
             minimum_option_duration: value.minimum_option_duration,
             allowed_denom: value.allowed_denom.into(),
             min_bid_inc_bips: value.min_bid_inc_bips,

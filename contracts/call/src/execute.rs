@@ -5,14 +5,13 @@ use cosmwasm_std::{
 use cw_utils::Expiration;
 
 use common::{
-    addr::{assert_valid_addr, into_addr, PREFIX},
+    addr::{assert_valid_addr, PREFIX},
     denom::find_allowed_coin,
     errors::ContractError,
     msg::bank_send_msg,
     nft,
     types::{AssetId, OptionId, TokenId},
 };
-use factory::msg::QueryMsg;
 use vault::{
     msg::{
         CurrentEntitlementOperatorResponse, ExecuteMsg as VaultExecuteMsg,
@@ -23,10 +22,11 @@ use vault::{
         set_beneficial_owner_wasm_msg,
     },
 };
+use vault_factory::msg::QueryMsg;
 
 use crate::{
     state::{CallOption, Config, OPTION_CLAIMS},
-    utils::{burn_option_nft, is_beneficial_owner_or_operator, mint_option, option_owner},
+    utils::{burn_option_nft, is_beneficial_owner_or_operator, mint_call, option_owner},
 };
 
 // MESSAGE HANDLERS
@@ -37,18 +37,19 @@ pub fn mint_with_nft(
     deps: DepsMut,
     env: &Env,
     info: MessageInfo,
-    nft: String,
+    nft_addr: String,
     nft_id: TokenId,
     strike: Uint128,
     expiration: Expiration,
     config: &Config,
 ) -> Result<Response, ContractError> {
-    // check that sender uses allowed nft
-    if config.allowed_underlying_nft != nft {
-        return Err(StdError::generic_err("mint_with_nft - nft not allowes").into());
-    }
+    // let nft_addr = into_addr(deps.api, nft, PREFIX)?;
+    let nft_addr = deps.api.addr_validate(&nft_addr)?;
 
-    let nft_addr = into_addr(deps.api, nft, PREFIX)?;
+    // check that sender uses allowed nft
+    if config.allowed_underlying_nft != nft_addr {
+        return Err(StdError::generic_err("mint_with_nft - nft not allowed").into());
+    }
 
     // check if the sender is an owner, or has a approval, or is an nft operator
     let owner = nft::owner_of(&deps.querier, &nft_addr, &nft_id)?.owner;
@@ -59,12 +60,9 @@ pub fn mint_with_nft(
     let is_contract_operator = operators.iter().any(|a| a.spender == env.contract.address);
     let is_contract_has_approval = approvals.iter().any(|a| a.spender == env.contract.address);
 
-    if owner != info.sender || !is_sender_operator || !is_sender_has_approval {
-        return Err(StdError::generic_err("mint_with_nft - caller not owner or operator").into());
-    }
     ensure!(
-        owner == info.sender || is_contract_has_approval || is_contract_operator,
-        StdError::generic_err("mint_with_nft - caller not owner or operator or has approval")
+        owner == info.sender || is_sender_operator || is_sender_has_approval,
+        StdError::generic_err("mint_with_nft - caller not owner or operator")
     );
     ensure!(
         is_contract_operator || is_contract_has_approval,
@@ -75,7 +73,7 @@ pub fn mint_with_nft(
     let vault_addr = deps
         .querier
         .query_wasm_smart::<Option<Addr>>(
-            &config.factory_addr,
+            &config.vault_factory_addr,
             &QueryMsg::GetMultiOrSoloVault {
                 nft_addr: nft_addr.as_str().into(),
                 nft_id: Some(nft_id.clone()),
@@ -85,10 +83,9 @@ pub fn mint_with_nft(
             "mint_with_nft - appropriate vault not found",
         ))?;
 
-    let new_option_id = mint_option(
+    let new_option_id = mint_call(
         deps,
         env,
-        &info,
         owner,
         &vault_addr,
         &nft_id,
@@ -110,7 +107,7 @@ pub fn mint_with_nft(
 
 /// Mints a new call option for the assets deposited in a particular vault given strike price and expiration.
 #[allow(clippy::too_many_arguments)]
-pub fn mint_with_vault(
+pub(crate) fn mint_with_vault(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -159,10 +156,9 @@ pub fn mint_with_vault(
         "mint_with_vault - beneficial owner not set",
     ))?;
 
-    let new_option_id = mint_option(
+    let new_option_id = mint_call(
         deps,
         &env,
-        &info,
         writer_addr,
         &vault,
         &asset_id,
@@ -190,7 +186,7 @@ pub fn mint_with_vault(
 /// Mints a new call option for the assets deposited in a particular vault given strike price and expiration.
 /// That vault must already have a registered entitlement for this contract with the an expiration equal to {expirationTime}
 #[allow(clippy::too_many_arguments)]
-pub fn mint_with_entitled_vault(
+pub(crate) fn mint_with_entitled_vault(
     deps: DepsMut,
     env: &Env,
     info: MessageInfo,
@@ -263,10 +259,9 @@ pub fn mint_with_entitled_vault(
         "mint_with_entitled_vault - beneficial owner not set",
     ))?;
 
-    let new_option_id = mint_option(
+    let new_option_id = mint_call(
         deps,
         env,
-        &info,
         writer_addr,
         vault,
         &asset_id,
@@ -280,7 +275,7 @@ pub fn mint_with_entitled_vault(
         .add_attribute("option_id", new_option_id.to_string()))
 }
 
-pub fn bid(
+pub(crate) fn bid(
     deps: DepsMut,
     info: MessageInfo,
     option_id: &OptionId,
@@ -370,7 +365,7 @@ pub fn bid(
 
 /// Allows the writer to reclaim an entitled asset. This is only possible when the writer holds the option
 /// nft and calls this function.
-pub fn reclaim_asset(
+pub(crate) fn reclaim_asset(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -448,7 +443,7 @@ pub fn reclaim_asset(
 
 /// Permissionlessly settle an expired option when the option expires in the money,
 /// distributing the proceeds to the Writer, Holder, and Bidder
-pub fn settle_option(
+pub(crate) fn settle_option(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -506,7 +501,7 @@ pub fn settle_option(
 }
 
 /// Allows anyone to burn the instrument NFT for an expired option
-pub fn burn_expired_option(
+pub(crate) fn burn_expired_option(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -536,7 +531,7 @@ pub fn burn_expired_option(
 
 /// Allows the option owner to claim proceeds if the option was settled
 /// by another account. The option NFT is burned after settlement.
-pub fn claim_option_proceeds(
+pub(crate) fn claim_option_proceeds(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -558,6 +553,12 @@ pub fn claim_option_proceeds(
     Ok(Response::new()
         .add_message(send_claim_msg)
         .add_attribute("action", "claim_option_proceeds"))
+}
+
+pub fn for_test() -> Result<Response, ContractError> {
+    let r = 10;
+    let _ = r;
+    Ok(Response::default())
 }
 
 /*

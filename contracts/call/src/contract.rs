@@ -1,22 +1,20 @@
 use cosmwasm_std::{
-    entry_point, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdResult,
+    entry_point, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdError, StdResult,
 };
-
-use cw_utils::maybe_addr;
 
 use common::errors::ContractError;
 
 use crate::{
     execute,
-    msg::{CallOptionExecuteMsg, CallOptionQueryMsg, InstantiateMsg},
+    msg::{CallInstrumentExecuteMsg, CallInstrumentQueryMsg, InstantiateMsg},
     query,
     state::Config,
 };
 
-pub type Cw721CallOptionContract<'a> =
-    cw721_base::Cw721Contract<'a, Empty, Empty, CallOptionExecuteMsg, CallOptionQueryMsg>;
+pub type CallInstrumentContract<'a> =
+    cw721_base::Cw721Contract<'a, Empty, Empty, CallInstrumentExecuteMsg, CallInstrumentQueryMsg>;
 
-pub(crate) const CONTRACT_NAME: &str = "crates.io:interchainnft-options-factory";
+pub(crate) const CONTRACT_NAME: &str = "crates.io:interchainnft-options-call-instrument";
 pub(crate) const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -32,18 +30,19 @@ pub fn instantiate(
     config.validate(deps.api)?;
     config.save(deps.storage)?;
 
-    let owner = maybe_addr(deps.api, msg.owner).unwrap_or(Some(info.sender.to_owned()));
-
+    let minter = env.contract.address.to_string(); // TODO check minter address
     let cw721_base_instantiate_msg = cw721_base::InstantiateMsg {
         name: msg.name,
         symbol: msg.symbol,
-        minter: owner.unwrap().into_string(),
+        minter: minter.clone(),
     };
 
-    Cw721CallOptionContract::default().instantiate(deps, env, info, cw721_base_instantiate_msg)?;
+    CallInstrumentContract::default().instantiate(deps, env, info, cw721_base_instantiate_msg)?;
 
     // TODO add sender?
-    Ok(Response::new().add_attribute("action", "instantiate"))
+    Ok(Response::new()
+        .add_attribute("action", "instantiate")
+        .add_attribute("minter", minter))
 }
 
 #[allow(unused_variables)] // TODO remove
@@ -52,14 +51,14 @@ pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: cw721_base::ExecuteMsg<Empty, CallOptionExecuteMsg>,
+    msg: cw721_base::ExecuteMsg<Empty, CallInstrumentExecuteMsg>,
 ) -> Result<Response, ContractError> {
     let config = Config::load(deps.storage)?;
 
     match msg {
         // handle custom call option messages
         cw721_base::ExecuteMsg::Extension { msg } => match msg {
-            CallOptionExecuteMsg::MintWithNFT {
+            CallInstrumentExecuteMsg::MintWithNFT {
                 nft_addr,
                 nft_id,
                 strike,
@@ -68,7 +67,7 @@ pub fn execute(
                 deps, &env, info, nft_addr, nft_id, strike, expiration, &config,
             ),
 
-            CallOptionExecuteMsg::MintWithVault {
+            CallInstrumentExecuteMsg::MintWithVault {
                 vault_addr,
                 asset_id,
                 strike,
@@ -77,7 +76,7 @@ pub fn execute(
                 deps, env, info, vault_addr, asset_id, strike, expiration, &config,
             ),
 
-            CallOptionExecuteMsg::MintWithEntitledVault {
+            CallInstrumentExecuteMsg::MintWithEntitledVault {
                 vault_addr,
                 asset_id,
                 strike,
@@ -93,30 +92,37 @@ pub fn execute(
                 &config,
             ),
 
-            CallOptionExecuteMsg::Bid { option_id } => {
+            CallInstrumentExecuteMsg::Bid { option_id } => {
                 execute::bid(deps, info, &option_id, &config)
             }
 
-            CallOptionExecuteMsg::ReclaimAsset {
+            CallInstrumentExecuteMsg::ReclaimAsset {
                 option_id,
                 withdraw,
             } => execute::reclaim_asset(deps, env, info, &option_id, withdraw, &config),
 
-            CallOptionExecuteMsg::SettleOption { option_id } => {
+            CallInstrumentExecuteMsg::SettleOption { option_id } => {
                 execute::settle_option(deps, env, info, &option_id, &config)
             }
 
-            CallOptionExecuteMsg::BurnExpiredOption { option_id } => {
+            CallInstrumentExecuteMsg::BurnExpiredOption { option_id } => {
                 execute::burn_expired_option(deps, env, info, &option_id)
             }
 
-            CallOptionExecuteMsg::ClaimOptionProceeds { option_id } => {
+            CallInstrumentExecuteMsg::ClaimOptionProceeds { option_id } => {
                 execute::claim_option_proceeds(deps, env, info, &option_id, &config)
             }
+
+            CallInstrumentExecuteMsg::ForTest {} => execute::for_test(),
         },
 
+        // cant mint cw721 token
+        cw721_base::ExecuteMsg::Mint { .. } => {
+            Err(StdError::generic_err("direct minting is forbidden").into())
+        }
+
         // handle standard cw721 messages
-        _ => Cw721CallOptionContract::default()
+        _ => CallInstrumentContract::default()
             .execute(deps, env, info, msg)
             .map_err(|e| e.into()),
     }
@@ -126,35 +132,39 @@ pub fn execute(
 pub fn query(
     deps: Deps,
     env: Env,
-    msg: cw721_base::QueryMsg<CallOptionQueryMsg>,
+    msg: cw721_base::QueryMsg<CallInstrumentQueryMsg>,
 ) -> StdResult<Binary> {
     match msg {
         cw721_base::QueryMsg::Extension { msg } => match msg {
-            CallOptionQueryMsg::CurrentBid { option_id } => query::current_bid(deps, &option_id),
+            CallInstrumentQueryMsg::CurrentBid { option_id } => {
+                query::current_bid(deps, &option_id)
+            }
 
-            CallOptionQueryMsg::CurrentBidder { option_id } => {
+            CallInstrumentQueryMsg::CurrentBidder { option_id } => {
                 query::current_bidder(deps, &option_id)
             }
 
-            CallOptionQueryMsg::GetVaultAddress { option_id } => {
+            CallInstrumentQueryMsg::GetVaultAddress { option_id } => {
                 query::get_vault_address(deps, &option_id)
             }
 
-            CallOptionQueryMsg::GetOptionIdForAsset { vault, asset_id } => {
+            CallInstrumentQueryMsg::GetOptionIdForAsset { vault, asset_id } => {
                 query::get_option_id_for_asset(deps, vault, &asset_id)
             }
 
-            CallOptionQueryMsg::GetAssetId { option_id } => query::get_asset_id(deps, &option_id),
+            CallInstrumentQueryMsg::GetAssetId { option_id } => {
+                query::get_asset_id(deps, &option_id)
+            }
 
-            CallOptionQueryMsg::GetStrikePrice { option_id } => {
+            CallInstrumentQueryMsg::GetStrikePrice { option_id } => {
                 query::get_strike_price(deps, &option_id)
             }
 
-            CallOptionQueryMsg::GetExpiration { option_id } => {
+            CallInstrumentQueryMsg::GetExpiration { option_id } => {
                 query::get_expiration(deps, &option_id)
             }
         },
-        _ => Cw721CallOptionContract::default().query(deps, env, msg),
+        _ => CallInstrumentContract::default().query(deps, env, msg),
     }
 }
 

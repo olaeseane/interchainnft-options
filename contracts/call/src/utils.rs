@@ -1,8 +1,9 @@
 // HELPERS
 use cosmwasm_std::{
-    ensure, from_binary, Addr, DepsMut, Empty, Env, MessageInfo, QuerierWrapper, StdError,
-    StdResult, Uint128,
+    ensure, from_binary, to_binary, Addr, CosmosMsg, DepsMut, Empty, Env, MessageInfo,
+    QuerierWrapper, StdError, StdResult, Uint128, WasmMsg,
 };
+use cw721_base::state::TokenInfo;
 use cw_utils::Expiration;
 
 use common::{
@@ -12,15 +13,15 @@ use common::{
 use vault::msg::QueryMsg as VaultQueryMsg;
 
 use crate::{
-    contract::Cw721CallOptionContract,
+    contract::CallInstrumentContract,
     state::{update_vault_asset_option, CallOption, Config, CALL_OPTIONS, VAULT_ASSET_OPTION},
+    InstantiateMsg,
 };
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn mint_option(
+pub(crate) fn mint_call(
     deps: DepsMut,
     env: &Env,
-    info: &MessageInfo,
     writer: impl Into<String>,
     vault: impl Into<String>,
     asset_id: &AssetId,
@@ -70,15 +71,34 @@ pub(crate) fn mint_option(
     // TODO if msg.sender and tokenOwner are different accounts, approve the msg.sender
     // to transfer the option NFT as it already had the right to transfer the underlying NFT.
 
-    // send the option NFT to the underlying token owner.
-    Cw721CallOptionContract::default().mint(
-        deps,
-        info.to_owned(),
-        next_option_id.to_string(),
-        writer_addr.into_string(),
-        None,
-        Empty {},
-    )?;
+    // info.sender =
+
+    // mint the option NFT to the underlying token owner.
+    /* Cw721CallOptionContract::default().mint(
+       deps,
+       info.to_owned(),
+       next_option_id.to_string(),
+       writer_addr.into_string(),
+       None,
+       Empty {},
+    )?;*/
+
+    // create the token
+    let nft_contract = CallInstrumentContract::default();
+    let token = TokenInfo {
+        owner: writer_addr,
+        approvals: vec![],
+        token_uri: None,
+        extension: Empty {},
+    };
+    nft_contract
+        .tokens
+        .update(deps.storage, &next_option_id.to_string(), |old| match old {
+            Some(_) => Err(cw721_base::ContractError::Claimed {}),
+            None => Ok(token),
+        })?;
+
+    nft_contract.increment_tokens(deps.storage)?;
 
     Ok(next_option_id)
 }
@@ -113,7 +133,7 @@ pub(crate) fn is_beneficial_owner_or_operator(
 }
 
 pub(crate) fn option_owner(deps: &DepsMut, env: &Env, token_id: String) -> StdResult<String> {
-    let resp: cw721::OwnerOfResponse = from_binary(&Cw721CallOptionContract::default().query(
+    let resp: cw721::OwnerOfResponse = from_binary(&CallInstrumentContract::default().query(
         deps.as_ref(),
         env.clone(),
         cw721_base::QueryMsg::OwnerOf {
@@ -132,7 +152,7 @@ pub fn burn_option_nft(
     token_id: String,
 ) -> Result<(), ContractError> {
     // burn the option NFT
-    Cw721CallOptionContract::default().execute(
+    CallInstrumentContract::default().execute(
         deps,
         env,
         info,
@@ -140,4 +160,37 @@ pub fn burn_option_nft(
     )?;
 
     Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn call_instrument_instantiate_wasm_msg(
+    name: String,
+    symbol: String,
+    code_id: u64,
+    nft_addr: String,
+    protocol_addr: String,
+    vault_factory_addr: String,
+    minimum_option_duration: u64,
+    allowed_denom: String,
+    min_bid_inc_bips: Uint128,
+    label: String,
+) -> StdResult<CosmosMsg<Empty>> {
+    let msg = to_binary(&InstantiateMsg {
+        name,
+        symbol,
+        protocol_addr,
+        allowed_underlying_nft: nft_addr,
+        vault_factory_addr,
+        minimum_option_duration,
+        allowed_denom,
+        min_bid_inc_bips,
+    })?;
+
+    Ok(CosmosMsg::Wasm(WasmMsg::Instantiate {
+        admin: None, // TODO set admin
+        code_id,
+        msg,
+        funds: vec![],
+        label,
+    }))
 }
