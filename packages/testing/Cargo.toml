@@ -9,6 +9,9 @@ authors.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+doctest = false
+
 [dependencies]
 serde = { workspace = true }
 cosmwasm-std = { workspace = true }
@@ -27,7 +30,8 @@ anyhow = "~1.0"
 
 rbac = { path = "../rbac" }
 common = { path = "../common" }
-vault = { path = "../../contracts/vault" }
-factory = { path = "../../contracts/factory" }
 protocol = { path = "../../contracts/protocol" }
-call-option = { path = "../../contracts/call-option" }
+vault-factory = { path = "../../contracts/vault-factory" }
+vault = { path = "../../contracts/vault" }
+call-factory = { path = "../../contracts/call-factory" }
+call = { path = "../../contracts/call" }
