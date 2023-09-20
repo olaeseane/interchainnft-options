@@ -8,7 +8,11 @@ version.workspace = true
 authors.workspace = true
 
 [lib]
+crate-type = ["cdylib", "rlib"]
 doctest = false
+
+[features]
+library = []
 
 [dependencies]
 serde = { workspace = true }
@@ -20,11 +24,10 @@ cw2 = { workspace = true }
 cw-ownable = { workspace = true }
 thiserror = { workspace = true }
 
-vault = { path = "../vault" }
-call = { path = "../call" }
+vault = { path = "../vault", features = ["library"] }
+call = { path = "../call", features = ["library"] }
 common = { path = "../../packages/common" }
 macros = { path = "../../packages/macros" }
-
 
 [dev-dependencies]
 env_logger = "~0.10"

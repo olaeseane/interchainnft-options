@@ -8,7 +8,11 @@ version.workspace = true
 authors.workspace = true
 
 [lib]
+crate-type = ["cdylib", "rlib"]
 doctest = false
+
+[features]
+library = []
 
 [dependencies]
 serde = { workspace = true }
@@ -21,9 +25,9 @@ cw-utils = { workspace = true }
 cw2 = { workspace = true }
 cw-ownable = { workspace = true }
 thiserror = { workspace = true }
-schemars = { workspace = true }
+# schemars = { workspace = true }
 
-vault = { path = "../vault" }
-vault-factory = { path = "../vault-factory" }
+vault = { path = "../vault", features = ["library"] }
+vault-factory = { path = "../vault-factory", features = ["library"] }
 common = { path = "../../packages/common" }
 macros = { path = "../../packages/macros" }
