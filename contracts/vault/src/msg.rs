@@ -1,12 +1,8 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Api};
+use cosmwasm_std::Addr;
 use cw_utils::Expiration;
 
-use common::{
-    addr::{assert_valid_addr, PREFIX},
-    errors::ContractError,
-    types::{AssetId, TokenId},
-};
+use common::types::{AssetId, TokenId};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -28,7 +24,12 @@ pub enum ExecuteMsg {
     },
 
     /// Allows the beneficial owner to grant an entitlement to an asset within the contract.
-    GrantEntitlement { entitlement: Entitlement },
+    GrantEntitlement {
+        asset_id: AssetId,
+        beneficial_owner: String,
+        operator: String,
+        expiry: Expiration,
+    },
 
     /// Withdrawal an unencumbered asset from this vault.
     WithdrawalAsset { asset_id: AssetId },
@@ -86,6 +87,15 @@ pub struct VaultInstantiateData {
 }
 
 #[cw_serde]
+pub struct SetEntitlement {
+    pub beneficial_owner: Addr,
+    pub entitled_operator: Addr,
+    pub approved_operator: Option<Addr>,
+    pub expiry: Expiration,
+}
+
+/*
+#[cw_serde]
 #[derive(Default)]
 pub struct Entitlement {
     /// The beneficial owner address this entitlement applies to. This address will also be the signer.
@@ -105,3 +115,4 @@ impl Entitlement {
         assert_valid_addr(api, vec![&self.beneficial_owner, &self.operator], PREFIX)
     }
 }
+*/

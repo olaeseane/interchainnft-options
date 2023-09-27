@@ -1,22 +1,22 @@
 use common::types::{AssetId, OptionId};
 use cosmwasm_std::{to_binary, Binary, Deps, StdResult};
 
-use crate::state::{CallOption, VAULT_ASSET_OPTION};
+use crate::state::{CallInstrument, VAULT_ASSET_OPTION};
 
 pub fn current_bid(deps: Deps, option_id: &OptionId) -> StdResult<Binary> {
-    let call = CallOption::load(deps.storage, option_id)?;
+    let call = CallInstrument::load(deps.storage, option_id)?;
 
     to_binary(&call.bid)
 }
 
 pub fn current_bidder(deps: Deps, option_id: &OptionId) -> StdResult<Binary> {
-    let call = CallOption::load(deps.storage, option_id)?;
+    let call = CallInstrument::load(deps.storage, option_id)?;
 
-    to_binary(&call.high_bidder)
+    to_binary(&call.bidder)
 }
 
 pub fn get_vault_address(deps: Deps, option_id: &OptionId) -> StdResult<Binary> {
-    let call = CallOption::load(deps.storage, option_id)?;
+    let call = CallInstrument::load(deps.storage, option_id)?;
 
     to_binary(&call.vault_addr)
 }
@@ -29,19 +29,19 @@ pub fn get_option_id_for_asset(deps: Deps, vault: String, asset_id: &AssetId) ->
 }
 
 pub fn get_asset_id(deps: Deps, option_id: &OptionId) -> StdResult<Binary> {
-    let call = CallOption::load(deps.storage, option_id)?;
+    let call = CallInstrument::load(deps.storage, option_id)?;
 
     to_binary(&call.asset_id)
 }
 
 pub fn get_strike_price(deps: Deps, option_id: &OptionId) -> StdResult<Binary> {
-    let call = CallOption::load(deps.storage, option_id)?;
+    let call = CallInstrument::load(deps.storage, option_id)?;
 
     to_binary(&call.strike)
 }
 
 pub fn get_expiration(deps: Deps, option_id: &OptionId) -> StdResult<Binary> {
-    let call = CallOption::load(deps.storage, option_id)?;
+    let call = CallInstrument::load(deps.storage, option_id)?;
 
     to_binary(&call.expiration)
 }

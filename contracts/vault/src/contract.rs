@@ -1,6 +1,6 @@
-use cosmwasm_std::{
-    entry_point, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
-};
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
+use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 
 use common::errors::ContractError;
 
@@ -14,7 +14,7 @@ use crate::{
 const CONTRACT_NAME: &str = "crates.io:interchainnft-options-vault";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -27,6 +27,7 @@ pub fn instantiate(
     config.validate(deps.api)?;
     config.save(deps.storage)?;
 
+    // TODO delete?
     let vault_instantiate_data = VaultInstantiateData {
         nft_addr: config.nft_addr,
         nft_id: config.nft_id,
@@ -38,7 +39,7 @@ pub fn instantiate(
         .add_attribute("sender", info.sender))
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
     env: Env,
@@ -56,9 +57,20 @@ pub fn execute(
             expiry,
         } => execute::impose_entitlement(deps, &env, &info.sender, asset_id, operator, expiry),
 
-        ExecuteMsg::GrantEntitlement { entitlement } => {
-            execute::grant_entitlement(deps, &env, &info.sender, &entitlement)
-        }
+        ExecuteMsg::GrantEntitlement {
+            asset_id,
+            beneficial_owner,
+            operator,
+            expiry,
+        } => execute::grant_entitlement(
+            deps,
+            &env,
+            &info.sender,
+            asset_id,
+            beneficial_owner,
+            operator,
+            expiry,
+        ),
 
         ExecuteMsg::WithdrawalAsset { asset_id } => {
             execute::withdrawal_asset(deps, &env, &info.sender, asset_id, &config)
@@ -88,7 +100,7 @@ pub fn execute(
     }
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     let config = CONFIG.load(deps.storage)?; // TODO use ContractError::ConfigNotFound
 

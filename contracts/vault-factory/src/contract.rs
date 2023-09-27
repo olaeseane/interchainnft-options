@@ -1,6 +1,7 @@
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    ensure, entry_point, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError,
-    StdResult,
+    ensure, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response, StdError, StdResult,
 };
 use cw_utils::parse_reply_instantiate_data;
 
@@ -61,7 +62,7 @@ pub fn execute(
     }
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     let _config = Config::load(deps.storage)?; // TODO use ContractError::COnfigNotFound
 
@@ -90,9 +91,9 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
             MULTI_VAULTS.save(
                 deps.storage,
                 &tmp.nft_addr,
-                &Addr::unchecked(res.contract_address),
+                &Addr::unchecked(&res.contract_address),
             )?;
-            Ok(Response::new())
+            Ok(Response::new().add_attribute("vault_addr", res.contract_address.to_string()))
         }
 
         INSTANTIATE_SOLO_VAULT_ID => {
@@ -108,9 +109,10 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
                     SOLO_VAULTS.save(
                         deps.storage,
                         (&tmp.nft_addr, &nft_id),
-                        &Addr::unchecked(res.contract_address),
+                        &Addr::unchecked(&res.contract_address),
                     )?;
-                    Ok(Response::new())
+                    Ok(Response::new()
+                        .add_attribute("vault_addr", res.contract_address.to_string()))
                 }
                 None => Err(StdError::generic_err("make_solo_vault - nft_id must be Some").into()),
             }

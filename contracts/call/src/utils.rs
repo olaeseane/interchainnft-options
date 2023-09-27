@@ -14,7 +14,7 @@ use vault::msg::QueryMsg as VaultQueryMsg;
 
 use crate::{
     contract::CallInstrumentContract,
-    state::{update_vault_asset_option, CallOption, Config, CALL_OPTIONS, VAULT_ASSET_OPTION},
+    state::{update_vault_asset_option, CallInstrument, Config, VAULT_ASSET_OPTION},
     InstantiateMsg,
 };
 
@@ -45,25 +45,26 @@ pub(crate) fn mint_call(
     // verify that, if there is a previous option on this asset, it has already settled.
     let prev_option_id = VAULT_ASSET_OPTION.may_load(deps.storage, (&vault_addr, asset_id))?;
     if let Some(prev_option_id) = prev_option_id {
-        let prev_option = CALL_OPTIONS.load(deps.storage, &prev_option_id)?;
+        let prev_option = CallInstrument::load(deps.storage, &prev_option_id)?;
+        // let prev_option = CALL_INSTRUMENTS.load(deps.storage, &prev_option_id)?;
         ensure!(
-            !prev_option.settled,
-            StdError::generic_err("mint_option_with_vault - previous option must be settled",)
+            prev_option.settled,
+            StdError::generic_err("mint_call - previous option must be settled",)
         );
     }
 
     // save the new option metadata
-    let call_option = CallOption {
+    let call_option = CallInstrument {
         asset_id: asset_id.clone(),
         writer_addr: writer_addr.clone(),
         expiration,
         vault_addr: vault_addr.clone(),
         strike,
         bid: Uint128::zero(),
-        high_bidder: None,
+        bidder: None,
         settled: false,
     };
-    let next_option_id = CallOption::inc(deps.storage)?;
+    let next_option_id = CallInstrument::inc(deps.storage)?;
     call_option.save(deps.storage, &next_option_id)?;
 
     update_vault_asset_option(deps.storage, &vault_addr, asset_id, next_option_id)?;
@@ -101,6 +102,37 @@ pub(crate) fn mint_call(
     nft_contract.increment_tokens(deps.storage)?;
 
     Ok(next_option_id)
+}
+
+#[allow(dead_code)]
+pub(crate) fn is_beneficial_owner(
+    querier: &QuerierWrapper,
+    vault_addr: &str,
+    asset_id: AssetId,
+    sender: &Addr,
+) -> StdResult<bool> {
+    let beneficial_owner: Option<Addr> = querier.query_wasm_smart(
+        vault_addr.clone(),
+        &VaultQueryMsg::BeneficialOwner {
+            asset_id: asset_id.clone(),
+        },
+    )?;
+
+    // Ok(beneficial_owner.filter(|addr| addr == sender))
+    Ok(beneficial_owner.is_some_and(|addr| addr == sender))
+}
+
+#[allow(dead_code)]
+pub(crate) fn is_operator(
+    querier: &QuerierWrapper,
+    vault_addr: &str,
+    asset_id: AssetId,
+    sender: &Addr,
+) -> StdResult<bool> {
+    let operator: Option<Addr> =
+        querier.query_wasm_smart(vault_addr, &VaultQueryMsg::ApprovedOperator { asset_id })?;
+
+    Ok(operator.is_some_and(|addr| addr == sender))
 }
 
 pub(crate) fn is_beneficial_owner_or_operator(
@@ -172,7 +204,7 @@ pub fn call_instrument_instantiate_wasm_msg(
     vault_factory_addr: String,
     minimum_option_duration: u64,
     allowed_denom: String,
-    min_bid_inc_bips: Uint128,
+    min_bid_increment_bps: u64,
     label: String,
 ) -> StdResult<CosmosMsg<Empty>> {
     let msg = to_binary(&InstantiateMsg {
@@ -183,7 +215,7 @@ pub fn call_instrument_instantiate_wasm_msg(
         vault_factory_addr,
         minimum_option_duration,
         allowed_denom,
-        min_bid_inc_bips,
+        min_bid_increment_bps,
     })?;
 
     Ok(CosmosMsg::Wasm(WasmMsg::Instantiate {

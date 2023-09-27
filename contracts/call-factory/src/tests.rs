@@ -3,8 +3,7 @@ use std::sync::Mutex;
 use common::errors::ContractError;
 use cosmwasm_std::{
     testing::{mock_dependencies, mock_env, mock_info, MockApi, MockQuerier, MockStorage},
-    to_binary, Addr, CosmosMsg, MessageInfo, OwnedDeps, ReplyOn, Response, SubMsg, Uint128,
-    WasmMsg,
+    to_binary, Addr, CosmosMsg, MessageInfo, OwnedDeps, ReplyOn, Response, SubMsg, WasmMsg,
 };
 use cw2::ContractVersion;
 use cw_ownable::OwnershipError;
@@ -45,7 +44,7 @@ fn setup(info_sender: &str) -> (OwnedDeps<MockStorage, MockApi, MockQuerier>, Me
         nft_name: "nft_name".to_string(),
         default_minimum_option_duration: 1,
         default_allowed_denom: "ATOM".to_string(),
-        default_min_bid_inc_bips: Uint128::new(1),
+        default_min_bid_increment_bps: 100,
         vault_factory_addr: "vault_factory_addr".to_string(),
     };
     let res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg);
@@ -65,7 +64,7 @@ fn proper_initialization() {
         nft_name: "nft_name".to_string(),
         default_minimum_option_duration: 1,
         default_allowed_denom: "ATOM".to_string(),
-        default_min_bid_inc_bips: Uint128::new(1),
+        default_min_bid_increment_bps: 100,
         vault_factory_addr: "vault_factory_addr".to_string(),
     };
 
@@ -88,7 +87,7 @@ fn proper_initialization() {
     assert_eq!(config.nft_name, "nft_name");
     assert_eq!(config.default_minimum_option_duration, 1);
     assert_eq!(config.default_allowed_denom, "ATOM");
-    assert_eq!(config.default_min_bid_inc_bips, Uint128::new(1));
+    assert_eq!(config.default_min_bid_increment_bps, 100);
     assert_eq!(config.vault_factory_addr, "vault_factory_addr");
 
     let version = cw2::get_contract_version(&deps.storage).unwrap();
@@ -132,7 +131,7 @@ fn make_call_instrument() {
                         allowed_underlying_nft: "call_instrument_addr".to_string(),
                         minimum_option_duration: 1,
                         allowed_denom: "ATOM".to_string(),
-                        min_bid_inc_bips: Uint128::new(1),
+                        min_bid_increment_bps: 100,
                         vault_factory_addr: "vault_factory_addr".to_string(),
                     })
                     .unwrap(),

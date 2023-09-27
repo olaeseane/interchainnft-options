@@ -26,7 +26,7 @@ pub(crate) fn make_call_instrument(
         config.vault_factory_addr.to_string(),
         config.default_minimum_option_duration,
         config.default_allowed_denom.to_string(),
-        config.default_min_bid_inc_bips,
+        config.default_min_bid_increment_bps,
         "Interchainnft-options call option nft".into(),
     )?;
 

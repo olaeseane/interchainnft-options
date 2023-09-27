@@ -1,0 +1,109 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ExecuteMsg",
+  "description": "This structure describes the execute messages of the contract.",
+  "oneOf": [
+    {
+      "description": "Pauses the protocol contracts for a set duration. When paused the protocol contracts is unable to execute messages.",
+      "type": "object",
+      "required": [
+        "pause"
+      ],
+      "properties": {
+        "pause": {
+          "type": "object",
+          "required": [
+            "duration"
+          ],
+          "properties": {
+            "duration": {
+              "$ref": "#/definitions/Duration"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Allows an admin to set the address of the deployed vault factory. All protocol components, including the call factory, to look up the vault factory.",
+      "type": "object",
+      "required": [
+        "set_vault_factory"
+      ],
+      "properties": {
+        "set_vault_factory": {
+          "type": "object",
+          "required": [
+            "contract_addr"
+          ],
+          "properties": {
+            "contract_addr": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Allows an admin to set the address of the deployed covered call factory This address is used by other protocols searching for the registry of protocols.",
+      "type": "object",
+      "required": [
+        "set_call_factory"
+      ],
+      "properties": {
+        "set_call_factory": {
+          "type": "object",
+          "required": [
+            "contract_addr"
+          ],
+          "properties": {
+            "contract_addr": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "definitions": {
+    "Duration": {
+      "description": "Duration is a delta of time. You can add it to a BlockInfo or Expiration to move that further in the future. Note that an height-based Duration and a time-based Expiration cannot be combined",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "height"
+          ],
+          "properties": {
+            "height": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Time in seconds",
+          "type": "object",
+          "required": [
+            "time"
+          ],
+          "properties": {
+            "time": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

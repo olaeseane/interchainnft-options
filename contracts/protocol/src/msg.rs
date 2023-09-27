@@ -1,6 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cw_utils::Duration;
 
+#[allow(unused_imports)]
 use crate::state::Config;
 
 #[cw_serde]

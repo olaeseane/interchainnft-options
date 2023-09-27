@@ -57,7 +57,7 @@ pub fn execute(
     }
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     let _config = Config::load(deps.storage)?; // TODO use ContractError::COnfigNotFound
 
@@ -80,9 +80,10 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
             CALL_INSTRUMENTS.save(
                 deps.storage,
                 &tmp.nft_addr,
-                &Addr::unchecked(res.contract_address),
+                &Addr::unchecked(&res.contract_address),
             )?;
-            Ok(Response::new())
+            Ok(Response::new()
+                .add_attribute("call_instrument_addr", res.contract_address.to_string()))
         }
 
         _ => Err(ContractError::UnknownReplyID {}),

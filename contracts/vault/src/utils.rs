@@ -9,7 +9,7 @@ use common::{
 
 use crate::{
     msg::{ExecuteMsg, InstantiateMsg},
-    state::{update_or_create_asset, Asset},
+    state::{update_or_create_entitlement, Entitlement},
 };
 
 pub fn vault_instantiate_wasm_msg(
@@ -74,10 +74,13 @@ pub fn clear_entitlement_and_distribute_wasm_msg(
     }))
 }
 
-pub(crate) fn has_active_entitlement(asset: &Asset, env: &Env) -> bool {
+pub(crate) fn has_active_entitlement(entitlement: &Entitlement, env: &Env) -> bool {
     // block.timestamp < assets[assetId].expiry && assets[assetId].operator != address(0);
     // TODO check condition
-    asset.expiry.is_some_and(|e| !e.is_expired(&env.block)) && asset.operator.is_some()
+    entitlement
+        .expiry
+        .is_some_and(|expiry| !expiry.is_expired(&env.block))
+        && entitlement.operator.is_some()
 }
 
 /// Returns the underlying token ID for a given asset.
@@ -90,26 +93,25 @@ pub(crate) fn register_entitlement(
     deps: DepsMut,
     env: &Env,
     asset_id: &AssetId,
-    prev_asset: Option<&Asset>,
-    new_asset: Asset,
+    prev: Option<&Entitlement>,
+    new: &Entitlement,
 ) -> Result<(), ContractError> {
     // TODO optimize
-    prev_asset
-        .map(|a| {
-            if has_active_entitlement(a, env) {
-                Err(ContractError::HasActiveEntitlement {})
-            } else {
-                Ok(())
-            }
-        })
-        .transpose()?;
+    prev.map(|e| {
+        if has_active_entitlement(e, env) {
+            Err(ContractError::HasActiveEntitlement {})
+        } else {
+            Ok(())
+        }
+    })
+    .transpose()?;
 
     ensure!(
-        !new_asset.expiry.unwrap().is_expired(&env.block),
+        !new.expiry.unwrap().is_expired(&env.block),
         StdError::generic_err("register_entitlement - entitlement must expire in the future",)
     );
 
-    update_or_create_asset(deps, asset_id, new_asset)?;
+    update_or_create_entitlement(deps, asset_id, new)?;
 
     Ok(())
 }

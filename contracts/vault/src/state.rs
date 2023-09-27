@@ -9,7 +9,7 @@ use common::{
 };
 use macros::ConfigStorage;
 
-use crate::msg::InstantiateMsg;
+use crate::msg::{InstantiateMsg, SetEntitlement};
 
 /// Saves factory settings
 pub const CONFIG: Item<Config> = Item::new("config");
@@ -43,33 +43,49 @@ impl From<InstantiateMsg> for Config {
 }
 
 #[cw_serde]
-pub struct Asset {
+/// Entitlements applied to each asset, which includes the beneficialOwner for the asset and the entitled operator
+/// If the entitled operator field is non-null, it means an unreleased entitlement has been applied
+pub struct Entitlement {
     /// The address that can claim the asset when it is free of entitlements.
-    pub beneficial_owner: Option<Addr>,
+    pub beneficial_owner: Option<Addr>, // TODO without Option?
+    /// The operating contract that can change ownership during the entitlement period.
     pub operator: Option<Addr>,
+    /// The block timestamp after which the asset is free of the entitlement.
     pub expiry: Option<Expiration>,
 }
 
+impl From<SetEntitlement> for Entitlement {
+    fn from(value: SetEntitlement) -> Self {
+        Self {
+            beneficial_owner: Some(value.beneficial_owner),
+            operator: Some(value.entitled_operator),
+            expiry: Some(value.expiry),
+        }
+    }
+}
+
 /// Current entitlements applied to each asset
-pub const ASSETS: Map<&AssetId, Asset> = Map::new("assets");
+pub const ASSETS: Map<&AssetId, Entitlement> = Map::new("assets");
 
 // update some attributes for a particular asset within the vault or create new one
-pub fn update_or_create_asset(
+pub fn update_or_create_entitlement(
     deps: DepsMut,
     asset_id: &AssetId,
-    new_asset: Asset,
+    entitlement: &Entitlement,
 ) -> StdResult<()> {
-    let updated_asset = new_asset.clone();
+    let entitlement_clone = entitlement.clone();
     if let Err(ContractError::AssetNotFound(asset_id)) =
-        ASSETS.update::<_, ContractError>(deps.storage, asset_id, |a| {
-            let mut asset = a.ok_or(ContractError::AssetNotFound(asset_id.to_string()))?;
-            asset.beneficial_owner = updated_asset.beneficial_owner.or(asset.beneficial_owner);
-            asset.operator = updated_asset.operator.or(asset.operator);
-            asset.expiry = updated_asset.expiry.or(asset.expiry);
-            Ok(asset)
+        ASSETS.update::<_, ContractError>(deps.storage, asset_id, |e| {
+            let mut entitlement = e.ok_or(ContractError::AssetNotFound(asset_id.to_string()))?;
+            entitlement.beneficial_owner = entitlement_clone
+                .beneficial_owner
+                .or(entitlement.beneficial_owner);
+            entitlement.operator = entitlement_clone.operator.or(entitlement.operator);
+            entitlement.expiry = entitlement_clone.expiry.or(entitlement.expiry);
+            Ok(entitlement)
         })
     {
-        ASSETS.save(deps.storage, &asset_id, &new_asset)?;
+        ASSETS.save(deps.storage, &asset_id, entitlement)?;
     };
 
     Ok(())

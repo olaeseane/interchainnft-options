@@ -1,6 +1,6 @@
 use common::errors::ContractError;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Api, StdResult, Storage, Uint128};
+use cosmwasm_std::{Addr, Api, StdResult, Storage};
 use cw_storage_plus::{Item, Map};
 
 use macros::ConfigStorage;
@@ -26,7 +26,7 @@ pub struct Config {
     /// TODO
     pub default_allowed_denom: String,
     /// TODO
-    pub default_min_bid_inc_bips: Uint128,
+    pub default_min_bid_increment_bps: u64,
     /// The address of the vault factory
     pub vault_factory_addr: String,
 }
@@ -45,7 +45,7 @@ impl From<InstantiateMsg> for Config {
             call_code_id: value.call_code_id,
             default_minimum_option_duration: value.default_minimum_option_duration,
             default_allowed_denom: value.default_allowed_denom,
-            default_min_bid_inc_bips: value.default_min_bid_inc_bips,
+            default_min_bid_increment_bps: value.default_min_bid_increment_bps,
             nft_symbol: value.nft_symbol,
             nft_name: value.nft_name,
             vault_factory_addr: value.vault_factory_addr,

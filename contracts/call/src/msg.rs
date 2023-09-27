@@ -20,7 +20,7 @@ pub struct InstantiateMsg {
     /// TODO
     pub allowed_denom: String,
     /// TODO
-    pub min_bid_inc_bips: Uint128,
+    pub min_bid_increment_bps: u64,
 }
 
 #[cw_serde]

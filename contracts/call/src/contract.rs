@@ -1,6 +1,6 @@
-use cosmwasm_std::{
-    entry_point, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdError, StdResult,
-};
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
+use cosmwasm_std::{Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdError, StdResult};
 
 use common::errors::ContractError;
 
@@ -45,7 +45,6 @@ pub fn instantiate(
         .add_attribute("minter", minter))
 }
 
-#[allow(unused_variables)] // TODO remove
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
@@ -128,7 +127,7 @@ pub fn execute(
     }
 }
 
-#[entry_point]
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(
     deps: Deps,
     env: Env,
@@ -167,37 +166,3 @@ pub fn query(
         _ => CallInstrumentContract::default().query(deps, env, msg),
     }
 }
-
-/*
-/// The entry point to the contract for processing replies from submessages.
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
-    match msg {
-        Reply {
-            id: INSTANTIATE_PAIR_REPLY_ID,
-            result:
-                SubMsgResult::Ok(SubMsgResponse {
-                    data: Some(data), ..
-                }),
-        } => {
-            let tmp = TMP_PAIR_INFO.load(deps.storage)?;
-            if PAIRS.has(deps.storage, &tmp.pair_key) {
-                return Err(ContractError::PairWasRegistered {});
-            }
-
-            let init_response = parse_instantiate_response_data(data.as_slice())
-                .map_err(|e| StdError::generic_err(format!("{e}")))?;
-
-            let pair_contract = deps.api.addr_validate(&init_response.contract_address)?;
-
-            PAIRS.save(deps.storage, &tmp.pair_key, &pair_contract)?;
-
-            Ok(Response::new().add_attributes(vec![
-                attr("action", "register"),
-                attr("pair_contract_addr", pair_contract),
-            ]))
-        }
-        _ => Err(ContractError::FailedToParseReply {}),
-    }
-}
- */

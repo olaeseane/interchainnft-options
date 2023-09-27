@@ -2,10 +2,9 @@ use cosmwasm_std::{
     ensure, to_binary, Addr, CosmosMsg, DepsMut, Empty, Env, MessageInfo, Response, StdError,
     Uint128, WasmMsg,
 };
-use cw_utils::Expiration;
+use cw_utils::{nonpayable, Expiration};
 
 use common::{
-    addr::{assert_valid_addr, PREFIX},
     denom::find_allowed_coin,
     errors::ContractError,
     msg::bank_send_msg,
@@ -15,7 +14,7 @@ use common::{
 use vault::{
     msg::{
         CurrentEntitlementOperatorResponse, ExecuteMsg as VaultExecuteMsg,
-        QueryMsg as VaultQueryMsg,
+        QueryMsg as VaultQueryMsg, SetEntitlement,
     },
     utils::{
         clear_entitlement_and_distribute_wasm_msg, clear_entitlement_wasm_msg,
@@ -25,7 +24,7 @@ use vault::{
 use vault_factory::msg::QueryMsg;
 
 use crate::{
-    state::{CallOption, Config, OPTION_CLAIMS},
+    state::{CallInstrument, Config, OPTION_CLAIMS},
     utils::{burn_option_nft, is_beneficial_owner_or_operator, mint_call, option_owner},
 };
 
@@ -86,7 +85,7 @@ pub fn mint_with_nft(
     let new_option_id = mint_call(
         deps,
         env,
-        owner,
+        &owner,
         &vault_addr,
         &nft_id,
         strike,
@@ -94,13 +93,24 @@ pub fn mint_with_nft(
         config,
     )?;
 
-    // transfer the underlying asset into our vault, passing along the entitlement. The entitlement specified
+    let set_entitlement = SetEntitlement {
+        beneficial_owner: info.sender,
+        entitled_operator: env.contract.address.clone(),
+        approved_operator: None,
+        expiry: expiration,
+    };
+
+    // send the underlying asset into our vault, passing along the entitlement. The entitlement specified
     // here will be accepted by the vault because we are also simultaneously tendering the asset.
-    // TODO add handle entitlement
-    let transfer_nft_msg = nft::transfer_nft(&nft_addr, &nft_id, &vault_addr)?;
+    let send_nft_msg = nft::send_nft(
+        &nft_addr,
+        &nft_id,
+        &vault_addr,
+        to_binary(&Some(set_entitlement))?,
+    )?;
 
     Ok(Response::new()
-        .add_submessage(transfer_nft_msg)
+        .add_submessage(send_nft_msg)
         .add_attribute("action", "mint_with_nft")
         .add_attribute("option_id", new_option_id.to_string()))
 }
@@ -117,7 +127,8 @@ pub(crate) fn mint_with_vault(
     expiration: Expiration,
     config: &Config,
 ) -> Result<Response, ContractError> {
-    assert_valid_addr(deps.api, vec![&vault], PREFIX)?;
+    deps.api.addr_validate(&vault)?;
+    // assert_valid_addr(deps.api, vec![&vault], PREFIX)?;
 
     // check that sender uses allowed nft
     let nft_addr: Addr = deps
@@ -142,24 +153,22 @@ pub(crate) fn mint_with_vault(
 
     // the beneficial owner is the only one able to impose entitlements, so
     // we need to require that they've done so here
-    let (ok, writer) =
+    let (ok, beneficial_owner) =
         is_beneficial_owner_or_operator(&deps.querier, &vault, asset_id.clone(), &info.sender)?;
     ensure!(
         ok,
         StdError::generic_err(
-            "mint_with_vault - called by someone other than the owner or operator",
+            "mint_with_vault - called by someone other than the beneficial owner or operator",
         )
     );
-
-    // TODO we need this checks?
-    let writer_addr = writer.ok_or(StdError::generic_err(
-        "mint_with_vault - beneficial owner not set",
+    let beneficial_owner = beneficial_owner.ok_or(StdError::generic_err(
+        "mint_with_entitled_vault - beneficial owner not set",
     ))?;
 
     let new_option_id = mint_call(
         deps,
         &env,
-        writer_addr,
+        beneficial_owner,
         &vault,
         &asset_id,
         strike,
@@ -289,9 +298,9 @@ pub(crate) fn bid(
     //     ));
     // );
     let mut new_bid = find_allowed_coin(info.funds.clone(), config.allowed_denom.as_ref())
-        .ok_or(StdError::generic_err("bid - not allowed denom"))?;
+        .ok_or(ContractError::DenomNotAllowed {})?;
 
-    let mut call = CallOption::load(deps.storage, option_id)?;
+    let mut call = CallInstrument::load(deps.storage, option_id)?;
 
     if info.sender == call.writer_addr {
         // Handle the case where an option writer bids on an underlying asset that they owned.
@@ -300,11 +309,24 @@ pub(crate) fn bid(
         new_bid.amount += call.strike;
     }
 
-    let min_required_amount = call
-        .bid
-        .checked_mul(config.min_bid_inc_bips)?
-        .checked_div(Uint128::new(10000))?
-        .checked_add(call.bid)?;
+    ensure!(
+        call.bid.u128() / 10_000 * 10_000 == call.bid.u128(),
+        StdError::generic_err("bid - bid amount too small")
+    ); // TODO why am I doing it?
+    let bid_increment: u128 =
+        (call.bid.u128() * config.min_bid_increment_bps as u128) / 10_000_u128;
+    let min_required_amount = call.bid.checked_add(bid_increment.into())?;
+
+    // min_required_amount = call_bid + ((call_bid * min_bid_increment_bips) / 10000)
+    // let network_fee = payment * params.trading_fee_percent / Uint128::from(100u128);
+    // new_bid.amount.multiply_ratio(90u128, 100u128);
+
+    // 1_000_000_000_000_000_000
+    // let bid_increment = call
+    //     .bid
+    //     .checked_mul(Decimal::percent(config.min_bid_increment_bps))?
+    //     .checked_div(Uint128::new(10000))?;
+    // let min_required_amount = call.bid.checked_add(bid_increment)?;
 
     ensure!(
         new_bid.amount >= min_required_amount,
@@ -313,7 +335,7 @@ pub(crate) fn bid(
 
     ensure!(
         new_bid.amount >= call.strike,
-        StdError::generic_err("bid - bid is lower than the strike price")
+        ContractError::BidIsLowerStrikePrice {}
     );
 
     let resp = Response::new()
@@ -321,50 +343,46 @@ pub(crate) fn bid(
         .add_attribute("bid_amount", new_bid.amount);
 
     // return bid to previous bidder
-    let bid_to_return = call.bid;
-    if call
-        .high_bidder
-        .as_ref()
-        .map_or(false, |b| b == call.writer_addr)
-    {
-        bid_to_return.checked_sub(call.strike)?;
-    }
-
-    let resp = match call.high_bidder {
-        Some(high_bidder) if bid_to_return > Uint128::zero() => {
-            // handle the case when high_bidder is Some and bid_to_return is greater than zero
-            let return_bid_msg = bank_send_msg(
-                high_bidder.into_string(),
-                config.allowed_denom.coins(&bid_to_return),
-            );
-            resp.add_message(return_bid_msg)
+    let resp = match call.bidder {
+        Some(high_bidder) => {
+            let bid_to_return = call.bid;
+            if high_bidder == call.writer_addr {
+                bid_to_return.checked_sub(call.strike)?;
+            }
+            if bid_to_return > Uint128::zero() {
+                // handle the case when high_bidder is Some and bid_to_return is greater than zero
+                let return_bid_msg = bank_send_msg(
+                    high_bidder.into_string(),
+                    config.allowed_denom.coins(&bid_to_return),
+                );
+                resp.add_message(return_bid_msg)
+            } else {
+                resp
+            }
         }
         _ => resp,
     };
 
     // set the new bidder
     call.bid = new_bid.amount;
-    call.high_bidder = Some(info.sender.clone());
+    call.bidder = Some(info.sender.clone());
+    call.save(deps.storage, option_id)?;
 
     // the new high bidder is the beneficial owner of the asset.
     // the beneficial owner must be set here instead of with a settlement
     // because otherwise the writer will be able to remove the asset from the vault
     // between the expiration and the settlement call, effectively stealing the asset.
-    let set_beneficial_owner_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: call.vault_addr.into_string(),
-        msg: to_binary(&VaultExecuteMsg::SetBeneficialOwner {
-            asset_id: call.asset_id,
-            new_beneficial_owner: info.sender.into_string(),
-        })?,
-        funds: vec![],
-    });
-    let resp = resp.add_message(set_beneficial_owner_msg);
+    let resp = resp.add_message(set_beneficial_owner_wasm_msg(
+        call.vault_addr.as_str(),
+        call.asset_id.as_str(),
+        info.sender.as_str(),
+    )?);
 
     Ok(resp)
 }
 
-/// Allows the writer to reclaim an entitled asset. This is only possible when the writer holds the option
-/// nft and calls this function.
+/// Allows the writer to reclaim an entitled asset. This is only possible
+/// when the writer holds the option nft and calls this function.
 pub(crate) fn reclaim_asset(
     deps: DepsMut,
     env: Env,
@@ -373,39 +391,40 @@ pub(crate) fn reclaim_asset(
     withdraw: bool,
     config: &Config,
 ) -> Result<Response, ContractError> {
-    let mut call = CallOption::load(deps.storage, option_id)?;
+    nonpayable(&info)?; // TODO ???
+
+    let mut call = CallInstrument::load(deps.storage, option_id)?;
 
     ensure!(
         call.writer_addr == info.sender,
-        ContractError::Unauthorized {}
+        ContractError::Unauthorized {} // TODO change type error
     );
     ensure!(
         !call.settled,
-        StdError::generic_err("reclaim_asset - option already settled",)
+        ContractError::OptionAlreadySettled(option_id.to_owned())
+    );
+    ensure!(
+        !call.expiration.is_expired(&env.block),
+        ContractError::OptionIsExpired {}
     );
 
     let owner_option = option_owner(&deps, &env, option_id.to_string())?;
-
     ensure!(
         call.writer_addr.to_owned().into_string() == owner_option,
         StdError::generic_err("reclaim_asset - writer must own option",)
     );
 
-    ensure!(
-        call.expiration.is_expired(&env.block),
-        StdError::generic_err("reclaim_asset - option expired",)
-    );
+    // settle the option
+    call.settled = true;
+    call.save(deps.storage, option_id)?;
 
     // burn the option NFT
     burn_option_nft(deps, env, info, option_id.to_string())?;
 
-    // settle the option
-    call.settled = true;
-
     let mut msgs = vec![];
 
     // return current bidder's money
-    if let Some(high_bidder) = call.high_bidder {
+    if let Some(high_bidder) = call.bidder {
         let returned_amount = if high_bidder == call.writer_addr {
             call.bid.checked_sub(call.strike)?
         } else {
@@ -425,7 +444,6 @@ pub(crate) fn reclaim_asset(
     )?);
 
     if withdraw {
-        //         IHookVault(call.vaultAddress).clearEntitlementAndDistribute(call.assetId, call.writer);
         msgs.push(clear_entitlement_and_distribute_wasm_msg(
             call.vault_addr.as_str(),
             call.asset_id.as_str(),
@@ -443,6 +461,9 @@ pub(crate) fn reclaim_asset(
 
 /// Permissionlessly settle an expired option when the option expires in the money,
 /// distributing the proceeds to the Writer, Holder, and Bidder
+/// WRITER (who originally called mint() and owned underlying asset) receives the `strike`
+/// HOLDER (ownerOf(optionId)) receives `bid - strike`
+/// HIGH BIDDER (call.bidder) that pays `bid`, becomes ownerOf NFT,
 pub(crate) fn settle_option(
     deps: DepsMut,
     env: Env,
@@ -450,18 +471,19 @@ pub(crate) fn settle_option(
     option_id: &OptionId,
     config: &Config,
 ) -> Result<Response, ContractError> {
-    let mut call = CallOption::load(deps.storage, option_id)?;
+    let mut call = CallInstrument::load(deps.storage, option_id)?;
 
     let high_bidder_addr = call
-        .high_bidder
-        .ok_or(StdError::generic_err("bid must be won by someone"))?;
+        .bidder
+        .clone()
+        .ok_or(ContractError::NoWinningBidder())?;
     ensure!(
         call.expiration.is_expired(&env.block),
-        StdError::generic_err("option must be expired")
+        ContractError::OptionNotExpired(option_id.to_owned())
     );
     ensure!(
         !call.settled,
-        StdError::generic_err("the call is already settled")
+        ContractError::OptionAlreadySettled(option_id.to_owned())
     );
 
     let spread = call.bid.checked_sub(call.strike)?;
@@ -470,6 +492,7 @@ pub(crate) fn settle_option(
 
     // set settled to prevent an additional attempt to settle the option
     call.settled = true;
+    call.save(deps.storage, option_id)?;
 
     let mut msgs = vec![];
 
@@ -507,19 +530,19 @@ pub(crate) fn burn_expired_option(
     info: MessageInfo,
     option_id: &OptionId,
 ) -> Result<Response, ContractError> {
-    let call = CallOption::load(deps.storage, option_id)?;
+    let call = CallInstrument::load(deps.storage, option_id)?;
 
     ensure!(
-        call.high_bidder.is_none(),
+        call.bidder.is_none(),
         StdError::generic_err("option has bids")
     );
     ensure!(
         call.expiration.is_expired(&env.block),
-        StdError::generic_err("option must be expired")
+        ContractError::OptionNotExpired(option_id.to_owned())
     );
     ensure!(
         !call.settled,
-        StdError::generic_err("option is already settled")
+        ContractError::OptionAlreadySettled(option_id.to_owned())
     );
 
     call.update(deps.storage, option_id)?;
@@ -541,7 +564,7 @@ pub(crate) fn claim_option_proceeds(
     let owner_option = option_owner(&deps, &env, option_id.to_string())?;
     ensure!(
         info.sender.clone().into_string() == owner_option,
-        StdError::generic_err("owner only")
+        ContractError::OnlyOptionOwner(info.sender.to_string())
     );
     let claim = OPTION_CLAIMS.load(deps.storage, option_id)?;
     OPTION_CLAIMS.remove(deps.storage, option_id);

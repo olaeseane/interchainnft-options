@@ -1,5 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Uint128};
+use cosmwasm_std::Addr;
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -18,7 +18,7 @@ pub struct InstantiateMsg {
     /// TODO
     pub default_allowed_denom: String,
     /// TODO
-    pub default_min_bid_inc_bips: Uint128,
+    pub default_min_bid_increment_bps: u64,
     /// The address of the vault factory
     pub vault_factory_addr: String,
 }

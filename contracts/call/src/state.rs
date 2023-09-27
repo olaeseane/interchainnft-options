@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Api, StdError, StdResult, Storage, Uint128};
+use cosmwasm_std::{Addr, Api, StdError, StdResult, Storage, Uint128, Uint64};
 use cw_storage_plus::{Item, Map};
 use cw_utils::Expiration;
 
@@ -32,7 +32,7 @@ pub struct Config {
     /// Min amount of the current bid that the new bid
     /// must exceed the current bid by in order to be considered valid.
     /// This amount is expressed in basis points (i.e. 1/100th of 1%)
-    pub min_bid_inc_bips: Uint128,
+    pub min_bid_increment_bps: u64,
 }
 
 impl Config {
@@ -54,7 +54,7 @@ impl From<InstantiateMsg> for Config {
             vault_factory_addr: Addr::unchecked(value.vault_factory_addr),
             minimum_option_duration: value.minimum_option_duration,
             allowed_denom: value.allowed_denom.into(),
-            min_bid_inc_bips: value.min_bid_inc_bips,
+            min_bid_increment_bps: value.min_bid_increment_bps,
         }
     }
 }
@@ -65,14 +65,14 @@ impl From<InstantiateMsg> for Config {
 /// @param preApprovedMarketplace the address of the contract which will automatically approved
 
 /// Counter for options
-pub const CALL_OPTIONS_COUNT: Item<u64> = Item::new("call_options_count");
+pub const CALL_INSTRUMENTS_COUNT: Item<u64> = Item::new("call_options_count");
 
 /// Storage of all existing options contracts.
-pub const CALL_OPTIONS: Map<&OptionId, CallOption> = Map::new("call_options");
+pub const CALL_INSTRUMENTS: Map<&OptionId, CallInstrument> = Map::new("call_options");
 
 /// The metadata for each covered call option stored within the protocol
 #[cw_serde]
-pub struct CallOption {
+pub struct CallInstrument {
     // TODO remove?
     /// The asset id of the underlying within the vault
     pub asset_id: AssetId,
@@ -87,13 +87,13 @@ pub struct CallOption {
     /// The current high bid in the settlement auction
     pub bid: Uint128,
     /// The address that made the current winning bid in the settlement auction
-    pub high_bidder: Option<Addr>,
+    pub bidder: Option<Addr>,
     // TODO Once this flag is set, ETH should not?
     /// Flag that marks when a settlement action has taken place successfully.
     pub settled: bool,
 }
 
-impl CallOption {
+impl CallInstrument {
     pub fn validate(&self, api: &dyn Api) -> Result<(), ContractError> {
         assert_valid_addr(
             api,
@@ -102,16 +102,16 @@ impl CallOption {
         )
     }
 
-    pub fn load(store: &dyn Storage, option_id: &OptionId) -> StdResult<CallOption> {
-        CALL_OPTIONS.load(store, option_id)
+    pub fn load(store: &dyn Storage, option_id: &OptionId) -> StdResult<CallInstrument> {
+        CALL_INSTRUMENTS.load(store, option_id)
     }
 
     pub fn save(&self, store: &mut dyn Storage, option_id: &OptionId) -> StdResult<()> {
-        CALL_OPTIONS.save(store, option_id, self)
+        CALL_INSTRUMENTS.save(store, option_id, self)
     }
 
     pub fn update(&self, store: &mut dyn Storage, option_id: &OptionId) -> StdResult<()> {
-        CALL_OPTIONS.update(store, option_id, |option| match option {
+        CALL_INSTRUMENTS.update(store, option_id, |option| match option {
             Some(_) => Ok(self.to_owned()),
             None => Err(StdError::generic_err("updated option not found")),
         })?;
@@ -119,18 +119,22 @@ impl CallOption {
     }
 
     pub fn count(storage: &dyn Storage) -> StdResult<u64> {
-        Ok(CALL_OPTIONS_COUNT.may_load(storage)?.unwrap_or_default())
+        Ok(CALL_INSTRUMENTS_COUNT
+            .may_load(storage)?
+            .unwrap_or_default())
     }
 
     pub fn inc(storage: &mut dyn Storage) -> StdResult<OptionId> {
-        let count = Self::count(storage)? + 1;
-        CALL_OPTIONS_COUNT.save(storage, &count)?;
+        let count = Uint64::new(Self::count(storage)?)
+            .checked_add(Uint64::new(1))?
+            .u64();
+        CALL_INSTRUMENTS_COUNT.save(storage, &count)?;
         Ok(count)
     }
 
     pub fn dec(storage: &mut dyn Storage) -> StdResult<OptionId> {
         let count = Self::count(storage)? - 1;
-        CALL_OPTIONS_COUNT.save(storage, &count)?;
+        CALL_INSTRUMENTS_COUNT.save(storage, &count)?;
         Ok(count)
     }
 }
